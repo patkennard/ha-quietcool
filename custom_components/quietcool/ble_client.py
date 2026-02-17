@@ -27,6 +27,21 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# The fan responds with short key names — map them to readable names
+_RESPONSE_KEY_MAP = {
+    "A": "Api",
+    "R": "Result",
+    "P": "PairState",
+    "M": "Mode",
+    "S": "Speed",
+    "T": "Timer",
+}
+
+
+def _normalize_keys(data: dict[str, Any]) -> dict[str, Any]:
+    """Expand short response keys to readable names."""
+    return {_RESPONSE_KEY_MAP.get(k, k): v for k, v in data.items()}
+
 
 class QuietCoolBLEClient:
     """BLE client for QuietCool fan communication."""
@@ -126,10 +141,14 @@ class QuietCoolBLEClient:
         # Try to parse as complete JSON
         try:
             text = self._receive_buffer.decode("utf-8")
-            _LOGGER.debug("BLE notify buffer: %s", text)
+            # Strip "QQ" prefix the fan adds before JSON
+            stripped = text.strip()
+            if stripped.startswith("QQ"):
+                stripped = stripped[2:]
+            _LOGGER.debug("BLE notify buffer: %s", stripped)
             # Check if we have a complete JSON object
-            if text.strip().startswith("{") and text.strip().endswith("}"):
-                self._response_data = text.strip()
+            if stripped.startswith("{") and stripped.endswith("}"):
+                self._response_data = stripped
                 self._receive_buffer.clear()
                 self._response_event.set()
         except UnicodeDecodeError:
@@ -174,7 +193,11 @@ class QuietCoolBLEClient:
                             self._response_event.wait(),
                             timeout=COMMAND_TIMEOUT,
                         )
-                        return json.loads(self._response_data)
+                        parsed = json.loads(self._response_data)
+                        if isinstance(parsed, dict):
+                            parsed = _normalize_keys(parsed)
+                        _LOGGER.debug("Parsed response: %s", parsed)
+                        return parsed
                     except asyncio.TimeoutError:
                         _LOGGER.debug(
                             "No response for %s (attempt %d/%d)",
