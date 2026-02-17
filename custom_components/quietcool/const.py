@@ -56,6 +56,6 @@ PRESET_TO_SPEED = {v: k for k, v in SPEED_TO_PRESET.items()}
 UPDATE_INTERVAL = 10
 
 # BLE protocol constants
-COMMAND_TIMEOUT = 3.5  # seconds
+COMMAND_TIMEOUT = 10  # seconds
 CONNECTION_TIMEOUT = 30  # seconds
 MAX_RETRIES = 5

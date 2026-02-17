@@ -9,6 +9,7 @@ from typing import Any
 
 from bleak import BleakClient
 from bleak.exc import BleakError
+from bleak_retry_connector import establish_connection, BleakClientWithServiceCache
 
 from .const import (
     CLASSICAL_CHAR_UUID,
@@ -57,18 +58,26 @@ class QuietCoolBLEClient:
         return self._client is not None and self._client.is_connected
 
     async def connect(self) -> None:
-        """Connect to the fan."""
+        """Connect to the fan using bleak-retry-connector."""
         if self.is_connected:
             return
 
-        self._client = BleakClient(
+        self._client = await establish_connection(
+            BleakClientWithServiceCache,
             self._ble_device,
-            disconnected_callback=self._on_disconnect,
+            self._ble_device.name or self._ble_device.address,
+            max_attempts=3,
         )
-        await self._client.connect()
+
+        services = self._client.services
+        if services is None:
+            await self._client.disconnect()
+            self._client = None
+            raise BLEConnectionError(
+                f"Failed to discover services on {self.address}"
+            )
 
         # Log all discovered services for debugging
-        services = self._client.services
         for svc in services:
             _LOGGER.debug(
                 "Service %s: %s",
@@ -92,6 +101,7 @@ class QuietCoolBLEClient:
             _LOGGER.debug("Connected in mesh mode to %s", self.address)
         else:
             await self._client.disconnect()
+            self._client = None
             raise BLEConnectionError(
                 f"No recognized QuietCool service found on {self.address}"
             )
@@ -106,11 +116,6 @@ class QuietCoolBLEClient:
                 await self._client.disconnect()
             except BleakError:
                 pass
-        self._client = None
-
-    def _on_disconnect(self, client: BleakClient) -> None:
-        """Handle unexpected disconnection."""
-        _LOGGER.debug("Disconnected from %s", self.address)
         self._client = None
 
     def _notification_handler(self, _sender: int, data: bytearray) -> None:
