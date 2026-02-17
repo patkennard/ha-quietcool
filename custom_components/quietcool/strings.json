@@ -1,0 +1,30 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "QuietCool Fan",
+        "description": "Select a discovered QuietCool fan to set up.",
+        "data": {
+          "address": "Device"
+        }
+      },
+      "bluetooth_confirm": {
+        "title": "QuietCool Fan",
+        "description": "Found QuietCool fan: {name}"
+      },
+      "pair": {
+        "title": "Pair with {name}",
+        "description": "Press the pairing button on your QuietCool fan, then click Submit to pair."
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to the fan. Make sure it is powered on and in range.",
+      "pairing_failed": "Pairing failed. Press the pairing button on the fan and try again.",
+      "unknown": "An unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "This device is already configured.",
+      "no_devices_found": "No QuietCool fans found nearby. Make sure the fan is powered on."
+    }
+  }
+}

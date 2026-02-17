@@ -1,0 +1,16 @@
+{
+  "domain": "quietcool",
+  "name": "QuietCool",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": ["bluetooth_adapters"],
+  "documentation": "https://github.com/your-repo/ha-quietcool",
+  "iot_class": "local_polling",
+  "bluetooth": [
+    { "local_name": "ATTICFAN*" },
+    { "local_name": "SHUTTERFAN*" },
+    { "local_name": "SOLARFAN*" }
+  ],
+  "requirements": ["bleak>=0.21.0"],
+  "version": "1.0.0"
+}

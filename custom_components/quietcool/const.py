@@ -1,0 +1,61 @@
+"""Constants for the QuietCool integration."""
+
+from uuid import UUID
+
+DOMAIN = "quietcool"
+
+# BLE device names used for discovery
+BLE_DEVICE_NAMES = {"ATTICFAN", "SHUTTERFAN", "SOLARFAN"}
+
+# Device types
+DEVICE_TYPE_ATTIC = 1
+DEVICE_TYPE_SHUTTER = 2
+DEVICE_TYPE_SOLAR = 3
+
+DEVICE_NAME_TO_TYPE = {
+    "ATTICFAN": DEVICE_TYPE_ATTIC,
+    "SHUTTERFAN": DEVICE_TYPE_SHUTTER,
+    "SOLARFAN": DEVICE_TYPE_SOLAR,
+}
+
+# BLE UUIDs — Classical (non-mesh) mode
+CLASSICAL_SERVICE_UUID = UUID("000000ff-0000-1000-8000-00805f9b34fb")
+CLASSICAL_CHAR_UUID = UUID("0000ff01-0000-1000-8000-00805f9b34fb")
+
+# BLE UUIDs — Mesh mode
+MESH_PROXY_SERVICE_UUID = UUID("00001828-0000-1000-8000-00805f9b34fb")
+MESH_PROXY_DATA_IN_UUID = UUID("00002add-0000-1000-8000-00805f9b34fb")
+MESH_PROXY_DATA_OUT_UUID = UUID("00002ade-0000-1000-8000-00805f9b34fb")
+
+# Fan speed string values (sent in JSON commands)
+SPEED_CLOSE = "CLOSE"
+SPEED_LOW = "LOW"
+SPEED_MEDIUM = "MEDIUM"
+SPEED_HIGH = "HIGH"
+
+# Fan operating modes
+MODE_IDLE = "Idle"
+MODE_RUN = "Run"
+MODE_TIMER = "Timer"
+MODE_TH = "TH"
+
+# Preset mode names for HA
+PRESET_MODE_LOW = "low"
+PRESET_MODE_MEDIUM = "medium"
+PRESET_MODE_HIGH = "high"
+
+SPEED_TO_PRESET = {
+    SPEED_LOW: PRESET_MODE_LOW,
+    SPEED_MEDIUM: PRESET_MODE_MEDIUM,
+    SPEED_HIGH: PRESET_MODE_HIGH,
+}
+
+PRESET_TO_SPEED = {v: k for k, v in SPEED_TO_PRESET.items()}
+
+# Polling interval in seconds
+UPDATE_INTERVAL = 10
+
+# BLE protocol constants
+COMMAND_TIMEOUT = 3.5  # seconds
+CONNECTION_TIMEOUT = 30  # seconds
+MAX_RETRIES = 5
