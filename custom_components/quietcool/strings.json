@@ -20,6 +20,8 @@
     "error": {
       "cannot_connect": "Unable to connect to the fan. Make sure it is powered on and in range.",
       "pairing_failed": "Pairing failed. Press the pairing button on the fan and try again.",
+      "already_paired": "This fan is already paired to another device. Reset the fan to pair with Home Assistant.",
+      "device_full": "The fan's pairing memory is full. Reset the fan to free up slots.",
       "unknown": "An unexpected error occurred."
     },
     "abort": {

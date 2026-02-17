@@ -34,7 +34,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Authenticate with the stored phone ID from pairing
     if phone_id:
         result = await client.login(phone_id)
-        if not result or result.get("Flag") != "success":
+        if not result or result.get("Result") != "Success":
             _LOGGER.warning(
                 "Login failed for %s — fan may need to be re-paired", address
             )

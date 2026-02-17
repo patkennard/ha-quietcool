@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import logging
-import uuid
+import secrets
 from typing import Any
 
 import voluptuous as vol
 
-from bleak import BleakClient
 from bleak.exc import BleakError
 
 from homeassistant.components.bluetooth import (
@@ -21,6 +20,9 @@ from .ble_client import BLEConnectionError, QuietCoolBLEClient
 from .const import BLE_DEVICE_NAMES, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+# Max pairing attempts (matches app's pairCount limit of 5)
+MAX_PAIR_ATTEMPTS = 5
 
 
 class QuietCoolConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -72,7 +74,6 @@ class QuietCoolConfigFlow(ConfigFlow, domain=DOMAIN):
             await self.async_set_unique_id(address)
             self._abort_if_unique_id_configured()
 
-            # Find the discovery info for the selected device
             for info in async_discovered_service_info(self.hass):
                 if info.address == address:
                     self._discovery_info = info
@@ -82,7 +83,6 @@ class QuietCoolConfigFlow(ConfigFlow, domain=DOMAIN):
 
             return self.async_abort(reason="no_devices_found")
 
-        # Build list of discovered QuietCool devices
         devices: dict[str, str] = {}
         for info in async_discovered_service_info(self.hass):
             if info.name and any(
@@ -107,14 +107,17 @@ class QuietCoolConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Handle pairing with the fan.
 
-        The user must press the pairing button on the fan, then confirm here.
-        We connect, send Login, and if that fails, send Pair.
+        Follows the app's exact sequence:
+        1. Connect via BLE
+        2. Send Login with PhoneID
+        3. If Login Result=Success → done
+        4. If Login Result=Fail and PairState=No → send Pair, then Login again
         """
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            # Generate a unique phone ID for this HA instance
-            self._phone_id = str(uuid.uuid4()).replace("-", "")[:16]
+            # Generate a 16-char hex PhoneID (matches Android's android_id format)
+            self._phone_id = secrets.token_hex(8)
 
             client: QuietCoolBLEClient | None = None
             try:
@@ -122,21 +125,49 @@ class QuietCoolConfigFlow(ConfigFlow, domain=DOMAIN):
                 client = QuietCoolBLEClient(self._discovery_info.device)
                 await client.connect()
 
-                # Try Login first (already paired)
+                # Step 1: Try Login first (matches app behavior)
+                _LOGGER.debug("Sending Login with PhoneID: %s", self._phone_id)
                 result = await client.login(self._phone_id)
-                if result and result.get("Flag") == "success":
+                _LOGGER.debug("Login response: %s", result)
+
+                if result and result.get("Result") == "Success":
                     _LOGGER.debug("Login succeeded, already paired")
                     return self._create_entry()
 
-                # Login failed — try Pair (new pairing)
-                result = await client.pair(self._phone_id)
-                if result and result.get("Flag") == "success":
-                    _LOGGER.debug("Pairing succeeded")
-                    return self._create_entry()
+                if result and result.get("Result") == "Fail":
+                    pair_state = result.get("PairState", "")
 
-                # Both failed
-                _LOGGER.warning("Pairing response: %s", result)
-                errors["base"] = "pairing_failed"
+                    if pair_state == "Yes":
+                        # Already paired to another device, can't pair again
+                        _LOGGER.warning("Fan is already paired to another device")
+                        errors["base"] = "already_paired"
+                    elif pair_state == "No":
+                        # Not paired — send Pair command, then Login again
+                        _LOGGER.debug("Not paired, sending Pair command")
+                        pair_result = await client.pair(self._phone_id)
+                        _LOGGER.debug("Pair response: %s", pair_result)
+
+                        if pair_result and pair_result.get("Result") == "Success":
+                            # Pair succeeded — send Login to confirm
+                            login_result = await client.login(self._phone_id)
+                            _LOGGER.debug("Post-pair Login response: %s", login_result)
+
+                            if login_result and login_result.get("Result") == "Success":
+                                _LOGGER.debug("Pairing and login succeeded")
+                                return self._create_entry()
+
+                            errors["base"] = "pairing_failed"
+                        elif pair_result and pair_result.get("Result") == "Beyond":
+                            _LOGGER.warning("Fan device memory full, cannot pair")
+                            errors["base"] = "device_full"
+                        else:
+                            errors["base"] = "pairing_failed"
+                    else:
+                        errors["base"] = "pairing_failed"
+                else:
+                    # No response or unexpected format
+                    _LOGGER.warning("Unexpected login response: %s", result)
+                    errors["base"] = "pairing_failed"
 
             except (BleakError, BLEConnectionError, TimeoutError) as err:
                 _LOGGER.error("Connection failed during pairing: %s", err)

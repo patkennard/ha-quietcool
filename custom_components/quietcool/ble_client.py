@@ -67,8 +67,16 @@ class QuietCoolBLEClient:
         )
         await self._client.connect()
 
-        # Determine mode: classical vs mesh
+        # Log all discovered services for debugging
         services = self._client.services
+        for svc in services:
+            _LOGGER.debug(
+                "Service %s: %s",
+                svc.uuid,
+                [str(c.uuid) for c in svc.characteristics],
+            )
+
+        # Determine mode: classical vs mesh
         classical_svc = services.get_service(str(CLASSICAL_SERVICE_UUID))
         mesh_svc = services.get_service(str(MESH_PROXY_SERVICE_UUID))
 
