@@ -118,20 +118,22 @@ class QuietCoolBLEClient:
                 pass
         self._client = None
 
-    def _notification_handler(self, _sender: int, data: bytearray) -> None:
+    def _notification_handler(self, _sender: Any, data: bytearray) -> None:
         """Handle incoming BLE notifications."""
+        _LOGGER.debug("BLE notify raw (%d bytes): %s", len(data), data.hex())
         self._receive_buffer.extend(data)
 
         # Try to parse as complete JSON
         try:
             text = self._receive_buffer.decode("utf-8")
+            _LOGGER.debug("BLE notify buffer: %s", text)
             # Check if we have a complete JSON object
             if text.strip().startswith("{") and text.strip().endswith("}"):
                 self._response_data = text.strip()
                 self._receive_buffer.clear()
                 self._response_event.set()
         except UnicodeDecodeError:
-            pass
+            _LOGGER.debug("BLE notify buffer not valid UTF-8 yet (%d bytes)", len(self._receive_buffer))
 
     async def _ensure_connected(self) -> None:
         """Ensure we're connected, reconnecting if necessary."""

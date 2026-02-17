@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import secrets
 from typing import Any
@@ -12,6 +13,7 @@ from bleak.exc import BleakError
 
 from homeassistant.components.bluetooth import (
     BluetoothServiceInfoBleak,
+    async_ble_device_from_address,
     async_discovered_service_info,
 )
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
@@ -122,8 +124,30 @@ class QuietCoolConfigFlow(ConfigFlow, domain=DOMAIN):
             client: QuietCoolBLEClient | None = None
             try:
                 assert self._discovery_info is not None
-                client = QuietCoolBLEClient(self._discovery_info.device)
+                assert self._address is not None
+
+                # Get a fresh BLEDevice — the one from discovery may be stale
+                ble_device = async_ble_device_from_address(
+                    self.hass, self._address, connectable=True
+                )
+                if ble_device is None:
+                    _LOGGER.error(
+                        "Could not find BLE device %s", self._address
+                    )
+                    errors["base"] = "cannot_connect"
+                    return self.async_show_form(
+                        step_id="pair",
+                        description_placeholders={
+                            "name": self._name or "QuietCool Fan"
+                        },
+                        errors=errors,
+                    )
+
+                client = QuietCoolBLEClient(ble_device)
                 await client.connect()
+
+                # Brief delay to let notifications stabilize
+                await asyncio.sleep(0.5)
 
                 # Step 1: Try Login first (matches app behavior)
                 _LOGGER.debug("Sending Login with PhoneID: %s", self._phone_id)
