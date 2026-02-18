@@ -159,33 +159,29 @@ class QuietCoolConfigFlow(ConfigFlow, domain=DOMAIN):
                     return self._create_entry()
 
                 if result and result.get("Result") == "Fail":
-                    pair_state = result.get("PairState", "")
+                    # Login failed — try to pair regardless of PairState.
+                    # PairState=Yes just means the fan has existing pairings,
+                    # not that it's full. The fan returns "Beyond" if full.
+                    _LOGGER.debug(
+                        "Login failed (PairState=%s), sending Pair command",
+                        result.get("PairState"),
+                    )
+                    pair_result = await client.pair(self._phone_id)
+                    _LOGGER.debug("Pair response: %s", pair_result)
 
-                    if pair_state == "Yes":
-                        # Already paired to another device, can't pair again
-                        _LOGGER.warning("Fan is already paired to another device")
-                        errors["base"] = "already_paired"
-                    elif pair_state == "No":
-                        # Not paired — send Pair command, then Login again
-                        _LOGGER.debug("Not paired, sending Pair command")
-                        pair_result = await client.pair(self._phone_id)
-                        _LOGGER.debug("Pair response: %s", pair_result)
+                    if pair_result and pair_result.get("Result") == "Success":
+                        # Pair succeeded — send Login to confirm
+                        login_result = await client.login(self._phone_id)
+                        _LOGGER.debug("Post-pair Login response: %s", login_result)
 
-                        if pair_result and pair_result.get("Result") == "Success":
-                            # Pair succeeded — send Login to confirm
-                            login_result = await client.login(self._phone_id)
-                            _LOGGER.debug("Post-pair Login response: %s", login_result)
+                        if login_result and login_result.get("Result") == "Success":
+                            _LOGGER.debug("Pairing and login succeeded")
+                            return self._create_entry()
 
-                            if login_result and login_result.get("Result") == "Success":
-                                _LOGGER.debug("Pairing and login succeeded")
-                                return self._create_entry()
-
-                            errors["base"] = "pairing_failed"
-                        elif pair_result and pair_result.get("Result") == "Beyond":
-                            _LOGGER.warning("Fan device memory full, cannot pair")
-                            errors["base"] = "device_full"
-                        else:
-                            errors["base"] = "pairing_failed"
+                        errors["base"] = "pairing_failed"
+                    elif pair_result and pair_result.get("Result") == "Beyond":
+                        _LOGGER.warning("Fan device memory full, cannot pair")
+                        errors["base"] = "device_full"
                     else:
                         errors["base"] = "pairing_failed"
                 else:
